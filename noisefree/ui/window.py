@@ -1,10 +1,11 @@
 import threading
 
-from PySide6.QtCore import QObject, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QGuiApplication, QKeySequence, QPalette, QShortcut
+from PySide6.QtCore import QObject, QPoint, QSettings, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QKeySequence, QPalette, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -14,7 +15,6 @@ from PySide6.QtWidgets import (
     QSlider,
     QStackedWidget,
     QSystemTrayIcon,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -24,9 +24,10 @@ from ..denoiser import available_providers, friendly
 from ..engine import Engine
 from ..resources import APP_NAME, VERSION
 from . import icons, theme
-from .widgets import Banner, Combo, FocusVisible, LevelMeter, PowerButton, Row, Themed, Toggle
+from .widgets import Banner, Combo, FocusVisible, IconLabel, LevelMeter, PowerButton, Row, Themed, TitleBar, Toggle
 
 PLATFORM = devices.PLATFORM
+WIDTH = 340
 CABLE_PRODUCT = {"win32": "VB-CABLE", "darwin": "BlackHole"}.get(PLATFORM)
 
 
@@ -54,7 +55,7 @@ def field(label, control, hint=""):
     w = QWidget()
     v = QVBoxLayout(w)
     v.setContentsMargins(0, 0, 0, 0)
-    v.setSpacing(6)
+    v.setSpacing(4)
     lbl = QLabel(label)
     lbl.setBuddy(control)
     v.addWidget(lbl)
@@ -83,14 +84,22 @@ class MainWindow(QMainWindow):
         self.active_provider, self.fell_back = "", False
         self.start_error = ""
         self.install_state, self.install_progress, self.install_error = None, 0.0, ""
-        self._quitting = False
+        self._quitting = self._ending = False
 
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(icons.app_icon())
-        self.setFixedWidth(400)
+        # We draw our own title bar; theme.native_frame() restores the taskbar button and shadow.
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinimizeButtonHint)
+        self.setFixedWidth(WIDTH)
 
-        self.stack = QStackedWidget(objectName="Root")
-        self.setCentralWidget(self.stack)
+        root = QWidget(objectName="Root")
+        rl = QVBoxLayout(root)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(0)
+        rl.addWidget(self._build_title_bar())
+        self.stack = QStackedWidget()
+        rl.addWidget(self.stack)
+        self.setCentralWidget(root)
         self.stack.addWidget(self._build_home())
         self.stack.addWidget(self._build_settings())
         self._build_tray()
@@ -109,93 +118,119 @@ class MainWindow(QMainWindow):
         self._focus_filter = FocusVisible(self)
         QApplication.instance().installEventFilter(self._focus_filter)
 
-        if not (start_hidden and self.tray.isVisible()):
+        # Windows may end the process at shutdown without a normal quit, so write settings out first.
+        QApplication.instance().commitDataRequest.connect(self._session_ending)
+        QApplication.instance().aboutToQuit.connect(self._session_ending)
+
+        # --minimized comes from launch at sign-in: reopen the window only if it was open last time.
+        self._restore_position()
+        if not (start_hidden and self.tray.isVisible() and not self.settings.value("window_open", True, type=bool)):
             self.show()
         QTimer.singleShot(0, self._boot)
 
     # ------------------------------------------------------------------ layout
 
+    def _build_title_bar(self):
+        self.title_bar = bar = TitleBar()
+        h = bar.layout()
+        self.back_btn = bar.button("Back (Esc)", "Back")
+        self.back_btn.clicked.connect(self.show_home)
+        self.back_btn.hide()
+        h.addWidget(self.back_btn)
+        self.logo = QLabel()
+        pm = icons.app_pixmap(40)
+        pm.setDevicePixelRatio(2)
+        self.logo.setPixmap(pm)
+        h.addWidget(self.logo)
+        h.addSpacing(6)
+        self.window_title = QLabel(APP_NAME, objectName="WindowTitle")
+        h.addWidget(self.window_title)
+        h.addStretch()
+        self.settings_btn = bar.button("Settings (Ctrl+,)", "Settings")
+        self.settings_btn.clicked.connect(self.show_settings)
+        self.min_btn = bar.button("Minimize", "Minimize")
+        self.min_btn.clicked.connect(self.showMinimized)
+        self.close_btn = bar.button("Close", "Close", close=True)
+        self.close_btn.clicked.connect(self.close)
+        for btn in (self.settings_btn, self.min_btn, self.close_btn):
+            h.addWidget(btn)
+        return bar
+
     def _build_home(self):
         page = QWidget()
         root = QVBoxLayout(page)
-        root.setContentsMargins(20, 16, 20, 20)
-        root.setSpacing(0)
+        root.setContentsMargins(14, 2, 14, 14)
+        root.setSpacing(12)
 
-        header = QHBoxLayout()
-        logo = QLabel()
-        logo.setPixmap(icons.app_pixmap(56).scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        header.addWidget(logo)
-        header.addSpacing(8)
-        header.addWidget(QLabel(APP_NAME, objectName="AppName"))
-        header.addStretch()
-        self.settings_btn = QToolButton(cursor=Qt.PointingHandCursor, toolTip="Settings (Ctrl+,)")
-        self.settings_btn.setAccessibleName("Settings")
-        self.settings_btn.clicked.connect(self.show_settings)
-        header.addWidget(self.settings_btn)
-        root.addLayout(header)
-        root.addSpacing(12)
-
+        hero = QHBoxLayout()
+        hero.setSpacing(12)
         self.power = PowerButton()
         self.power.setEnabled(False)
         self.power.toggled.connect(self._on_power)
-        root.addWidget(self.power, 0, Qt.AlignHCenter)
-        root.addSpacing(10)
-        self.hero = QLabel("Starting…", objectName="Hero", alignment=Qt.AlignCenter)
-        self.hero_sub = QLabel("Loading the noise-removal model", alignment=Qt.AlignCenter, wordWrap=True)
+        hero.addWidget(self.power)
+        text = QVBoxLayout()
+        text.setSpacing(2)
+        self.hero = QLabel("Starting…", objectName="Hero", wordWrap=True)
+        self.hero_sub = QLabel("Loading the noise-removal model", wordWrap=True)
         self.hero_sub.setProperty("role", "secondary")
-        root.addWidget(self.hero)
-        root.addSpacing(4)
-        root.addWidget(self.hero_sub)
-        root.addSpacing(20)
+        text.addStretch()
+        text.addWidget(self.hero)
+        text.addWidget(self.hero_sub)
+        text.addStretch()
+        hero.addLayout(text, 1)
+        root.addLayout(hero)
 
         card = QFrame(objectName="Card")
         cv = QVBoxLayout(card)
-        cv.setContentsMargins(16, 16, 16, 16)
-        cv.setSpacing(14)
+        cv.setContentsMargins(12, 12, 12, 12)
+        cv.setSpacing(12)
 
         self.mic_combo = Combo()
         self.mic_combo.setAccessibleName("Microphone")
+        self.mic_combo.setToolTip("Microphone")
         self.mic_combo.aboutToShow.connect(self._rescan_and_restart)
         self.mic_combo.activated.connect(self._on_mic_chosen)
-        cv.addWidget(field("Microphone", self.mic_combo))
+        mic = QHBoxLayout()
+        mic.setSpacing(8)
+        mic.addWidget(IconLabel("mic", "text_secondary", 18))
+        mic.addWidget(self.mic_combo, 1)
+        cv.addLayout(mic)
 
-        meters = QVBoxLayout()
-        meters.setSpacing(6)
+        meters = QGridLayout()
+        meters.setHorizontalSpacing(10)
+        meters.setVerticalSpacing(8)
         self.meter_in = LevelMeter("meter_raw", "Your microphone level")
         self.meter_out = LevelMeter("primary", "Level others hear")
-        for text, meter in (("Your microphone", self.meter_in), ("What others hear", self.meter_out)):
+        for i, (text, meter) in enumerate((("Your mic", self.meter_in), ("Others hear", self.meter_out))):
             lbl = QLabel(text)
             lbl.setProperty("role", "muted")
-            meters.addWidget(lbl)
-            meters.addWidget(meter)
-            meters.addSpacing(4)
+            meters.addWidget(lbl, i, 0)
+            meters.addWidget(meter, i, 1, Qt.AlignVCenter)
+        meters.setColumnStretch(1, 1)
         cv.addLayout(meters)
         cv.addWidget(divider())
 
-        strength_head = QHBoxLayout()
+        strength = QHBoxLayout()
+        strength.setSpacing(10)
         strength_lbl = QLabel("Strength")
-        self.strength_val = QLabel()
-        self.strength_val.setProperty("role", "value")
-        strength_head.addWidget(strength_lbl)
-        strength_head.addStretch()
-        strength_head.addWidget(self.strength_val)
         self.strength = QSlider(Qt.Horizontal, minimum=0, maximum=100, singleStep=5, pageStep=10)
         self.strength.setAccessibleName("Noise removal strength")
         self.strength.setCursor(Qt.PointingHandCursor)
         strength_lbl.setBuddy(self.strength)
         self.strength.valueChanged.connect(self._on_strength)
-        s = QVBoxLayout()
-        s.setSpacing(4)
-        s.addLayout(strength_head)
-        s.addWidget(self.strength)
-        cv.addLayout(s)
+        self.strength_val = QLabel(alignment=Qt.AlignRight | Qt.AlignVCenter)
+        self.strength_val.setProperty("role", "value")
+        self.strength_val.setFixedWidth(34)
+        strength.addWidget(strength_lbl)
+        strength.addWidget(self.strength, 1)
+        strength.addWidget(self.strength_val)
+        cv.addLayout(strength)
 
         self.monitor_toggle = Toggle("Hear yourself")
         self.monitor_toggle.toggled.connect(self._on_monitor)
         self.monitor_row = Row("Hear yourself", self.monitor_toggle, icon_name="headphones")
         cv.addWidget(self.monitor_row)
         root.addWidget(card)
-        root.addSpacing(12)
 
         self.banner = Banner()
         root.addWidget(self.banner)
@@ -205,32 +240,23 @@ class MainWindow(QMainWindow):
     def _build_settings(self):
         page = QWidget()
         outer = QVBoxLayout(page)
-        outer.setContentsMargins(12, 12, 12, 0)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        header = QHBoxLayout()
-        self.back_btn = QToolButton(cursor=Qt.PointingHandCursor, toolTip="Back (Esc)")
-        self.back_btn.setAccessibleName("Back")
-        self.back_btn.clicked.connect(self.show_home)
-        header.addWidget(self.back_btn)
-        header.addSpacing(4)
-        header.addWidget(QLabel("Settings", objectName="PageTitle"))
-        header.addStretch()
-        outer.addLayout(header)
 
         scroll = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         body = QWidget(objectName="SettingsBody")
         v = QVBoxLayout(body)
-        v.setContentsMargins(8, 12, 8, 20)
-        v.setSpacing(10)
+        v.setContentsMargins(14, 2, 14, 14)
+        v.setSpacing(6)
         scroll.setWidget(body)
         outer.addWidget(scroll)
 
         def card(*widgets):
             c = QFrame(objectName="Card")
             cl = QVBoxLayout(c)
-            cl.setContentsMargins(16, 14, 16, 14)
-            cl.setSpacing(14)
+            cl.setContentsMargins(12, 12, 12, 12)
+            cl.setSpacing(10)
             for i, w in enumerate(widgets):
                 if i:
                     cl.addWidget(divider())
@@ -246,7 +272,7 @@ class MainWindow(QMainWindow):
         self.provider_field = field("Run the AI model on", self.provider_combo, " ")
         v.addWidget(section("Processing"))
         v.addWidget(card(self.provider_field))
-        v.addSpacing(8)
+        v.addSpacing(6)
 
         # Hear yourself
         self.monitor_combo = Combo()
@@ -256,7 +282,7 @@ class MainWindow(QMainWindow):
         v.addWidget(section("Hear yourself"))
         v.addWidget(card(field("Listen through", self.monitor_combo,
                                "Use headphones so your speakers don't echo back into the mic.")))
-        v.addSpacing(8)
+        v.addSpacing(6)
 
         # App
         self.theme_combo = Combo()
@@ -271,11 +297,11 @@ class MainWindow(QMainWindow):
         v.addWidget(section("App"))
         v.addWidget(card(
             field("Appearance", self.theme_combo),
-            Row("Open when I sign in", self.autostart_toggle, "Starts quietly in the system tray."),
+            Row("Open when I sign in", self.autostart_toggle, "Opens the way you left it: in the tray or in a window."),
             Row("Keep running when closed", self.tray_toggle,
                 "Closing the window keeps your clean mic working from the tray."),
         ))
-        v.addSpacing(8)
+        v.addSpacing(6)
 
         # Virtual mic
         self.cable_status = QLabel(wordWrap=True)
@@ -291,14 +317,14 @@ class MainWindow(QMainWindow):
             vml.addWidget(self.reinstall_btn, 0, Qt.AlignLeft)
         v.addWidget(section("Virtual microphone"))
         v.addWidget(card(vm))
-        v.addSpacing(8)
+        v.addSpacing(6)
 
         # About
         credits = {"win32": 'VB-CABLE by VB-Audio (donationware, <a href="https://vb-audio.com/Cable/">vb-cable.com</a>)',
                    "darwin": 'BlackHole by Existential Audio (GPL-3.0)',
                    "linux": "PulseAudio / PipeWire"}.get(PLATFORM, "")
         about = QLabel(
-            f"{APP_NAME} {VERSION}<br><br>"
+            f"{APP_NAME} {VERSION}<br>"
             "Your audio is processed on this device and never leaves it.<br><br>"
             '<span>Noise removal: DTLN by N. Westhausen (MIT)<br>'
             f"Virtual cable: {credits}</span>", wordWrap=True, openExternalLinks=True)
@@ -340,13 +366,16 @@ class MainWindow(QMainWindow):
                           (QPalette.Link, "primary")):
             pal.setColor(role, QColor(t[key]))
         app.setPalette(pal)
-        app.setStyleSheet(theme.stylesheet(t))
+        framed = not theme.native_frame(self, t)
+        app.setStyleSheet(theme.stylesheet(t, framed))
         for w in self.findChildren(QWidget):
             if isinstance(w, Themed):
                 w.set_tokens(t)
-        self.settings_btn.setIcon(icons.icon("sliders", t["text_secondary"], 20))
-        self.back_btn.setIcon(icons.icon("back", t["text_secondary"], 20))
-        theme.set_title_bar_dark(self, t is theme.DARK)
+        for btn, name in ((self.settings_btn, "sliders"), (self.back_btn, "back"), (self.min_btn, "minus")):
+            btn.setIcon(icons.icon(name, t["text_secondary"], 16))
+        close = icons.icon("close", t["text_secondary"], 16)
+        close.addPixmap(icons.pixmap("close", "#FFFFFF", 16), QIcon.Active)  # white on the red hover
+        self.close_btn.setIcon(close)
 
     # ------------------------------------------------------------------ boot & devices
 
@@ -357,7 +386,7 @@ class MainWindow(QMainWindow):
         self.power.set_checked_silent(s.value("enabled", True, type=bool))
         self.engine.enabled = self.power.isChecked()
         self.tray_power.setChecked(self.power.isChecked())
-        self.monitor_toggle.set_checked_silent(False)  # never start with self-monitoring on
+        self.monitor_toggle.set_checked_silent(s.value("monitor_on", False, type=bool))
         self.tray_toggle.set_checked_silent(s.value("close_to_tray", True, type=bool))
         self.autostart_toggle.set_checked_silent(devices.autostart_enabled())
         idx = self.theme_combo.findData(s.value("theme", "system"))
@@ -496,10 +525,10 @@ class MainWindow(QMainWindow):
         self.power.setToolTip(("Turn off" if on else "Turn on") + " noise removal (Space)")
 
         mon = self._selected(self.monitor_combo, self.outputs)
-        self.monitor_row.hint.setText(
-            f"Playing through {mon.name}. Use headphones to avoid echo." if self.monitor_toggle.isChecked() and mon
-            else "Listen to the cleaned audio to check how you sound.")
-        self.monitor_row.hint.setVisible(True)
+        listening = self.monitor_toggle.isChecked() and mon
+        self.monitor_row.hint.setText(f"Through {mon.name}. Use headphones to avoid echo." if listening else "")
+        self.monitor_row.hint.setVisible(bool(listening))
+        self.monitor_row.setToolTip("" if listening else "Listen to the cleaned audio to check how you sound")
         self.monitor_toggle.setEnabled(bool(self.outputs) and ready)
 
         tip = f"{APP_NAME}: noise removal {'on' if on else 'off'}"
@@ -535,23 +564,24 @@ class MainWindow(QMainWindow):
             b.show_state("warning", "Almost there", body, primary=("Check again", self._recheck_cable))
         elif not self.cable:
             b.show_state("warning", "One more step: add the virtual microphone",
-                         f"{CABLE_PRODUCT} is a free audio driver that lets Teams, Zoom and other apps "
-                         "use your clean audio. You'll confirm the install in its own window.",
+                         f"{CABLE_PRODUCT} is a free driver that lets Teams, Zoom and other apps "
+                         "use your clean audio.",
                          primary=(f"Install {CABLE_PRODUCT}", self.install_cable),
                          secondary=("Check again", self._recheck_cable))
         elif e.error == "cable":
             b.show_state("error", "The virtual microphone stopped", "", primary=retry)
         else:
             b.show_state("success", "Ready for your calls",
-                         f"In Teams, Zoom or Discord, choose “{devices.MIC_NAME}” as your microphone.",
+                         f"Pick “{devices.MIC_NAME}” as the mic in Teams, Zoom or Discord.",
                          secondary=("Copy name", self._copy_mic_name))
         QTimer.singleShot(0, self._fit_height)
 
     def _fit_height(self):
-        """Size the window to the home page exactly; banner and hint text change length."""
+        """Size the window to the home page exactly; banner and hint text change length.
+        Settings uses the same height and scrolls."""
         lay = self.stack.widget(0).layout()
         h = lay.heightForWidth(self.width()) if lay.hasHeightForWidth() else lay.sizeHint().height()
-        self.setFixedHeight(h)
+        self.setFixedHeight(self.title_bar.height() + h)
 
     def _refresh_cable_ui(self):
         if self.cable:
@@ -586,6 +616,7 @@ class MainWindow(QMainWindow):
             self.engine.set_monitor(dev)
         except Exception:
             self.monitor_toggle.set_checked_silent(False)
+        self.settings.setValue("monitor_on", self.monitor_toggle.isChecked())
         self._refresh_state()
 
     def _on_monitor_device(self, _):
@@ -648,17 +679,50 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ navigation & lifecycle
 
     def show_settings(self):
-        self.stack.setCurrentIndex(1)
+        self._set_page(1, "Settings")
         self.back_btn.setFocus(Qt.OtherFocusReason)
 
     def show_home(self):
-        self.stack.setCurrentIndex(0)
+        self._set_page(0, APP_NAME)
+
+    def _set_page(self, index, title):
+        home = index == 0
+        self.stack.setCurrentIndex(index)
+        self.window_title.setText(title)
+        self.back_btn.setVisible(not home)
+        self.logo.setVisible(home)
+        self.settings_btn.setVisible(home)
 
     def show_window(self):
         self.show()
         self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
         self.raise_()
         self.activateWindow()
+
+    def _restore_position(self):
+        pos = self.settings.value("window_pos")
+        if isinstance(pos, QPoint) and QGuiApplication.screenAt(pos + QPoint(40, 20)):
+            self.move(pos)
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        if not e.spontaneous():  # minimising and restoring arrive as spontaneous events
+            self.settings.setValue("window_open", True)
+
+    def hideEvent(self, e):
+        super().hideEvent(e)
+        if not e.spontaneous() and not self._quitting and not self._ending:
+            self.settings.setValue("window_open", False)
+
+    def _session_ending(self, *_):
+        """Sign-out, shutdown or quit: windows may be closed for us now, which isn't the user hiding them."""
+        self._ending = True
+        self.settings.sync()
+
+    def moveEvent(self, e):
+        super().moveEvent(e)
+        if self.isVisible() and not self.isMinimized():
+            self.settings.setValue("window_pos", self.pos())
 
     def closeEvent(self, e):
         if not self._quitting and self.settings.value("close_to_tray", True, type=bool) and self.tray.isVisible():
@@ -673,6 +737,7 @@ class MainWindow(QMainWindow):
 
     def quit_app(self):
         self._quitting = True
+        self.settings.sync()
         self.engine.stop()
         if self.linux_mic:
             self.linux_mic.teardown()

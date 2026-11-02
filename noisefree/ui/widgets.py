@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QSizePolicy,
+    QStyledItemDelegate,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -91,8 +93,8 @@ class _KeyboardFocus:
 class PowerButton(_KeyboardFocus, _Animated, QAbstractButton):
     """Large round on/off switch. A soft halo breathes with the outgoing voice level."""
 
-    SIZE = 136
-    RADIUS = 48
+    SIZE = 76
+    RADIUS = 27
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -135,7 +137,7 @@ class PowerButton(_KeyboardFocus, _Animated, QAbstractButton):
             halo.setAlphaF(0.16 * t)
             p.setPen(Qt.NoPen)
             p.setBrush(halo)
-            halo_r = r + 6 + 12 * self._level * t
+            halo_r = r + 3 + 7 * self._level * t
             p.drawEllipse(c, halo_r, halo_r)
 
         hover = self.underMouse() and self.isEnabled()
@@ -150,12 +152,12 @@ class PowerButton(_KeyboardFocus, _Animated, QAbstractButton):
         p.drawEllipse(c, r, r)
 
         ic = mix(k["text_secondary"], k["on_primary"], t).name()
-        icons.paint(p, "power", ic, QRectF(c.x() - 20, c.y() - 20, 40, 40), stroke=2.2)
+        icons.paint(p, "power", ic, QRectF(c.x() - 12, c.y() - 12, 24, 24), stroke=2.4)
 
         if self.hasFocus() and self._kb_focus:
             p.setBrush(Qt.NoBrush)
             p.setPen(QPen(QColor(k["focus"]), 2))
-            p.drawEllipse(c, r + 5, r + 5)
+            p.drawEllipse(c, r + 4, r + 4)
         p.end()
 
     def enterEvent(self, e):
@@ -168,14 +170,14 @@ class PowerButton(_KeyboardFocus, _Animated, QAbstractButton):
 
 
 class Toggle(_KeyboardFocus, _Animated, QAbstractButton):
-    """iOS/Fluent-style switch, 40x22."""
+    """iOS/Fluent-style switch, 36x20."""
 
     def __init__(self, accessible_name="", parent=None):
         super().__init__(parent)
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.TabFocus)
-        self.setFixedSize(44, 26)
+        self.setFixedSize(40, 24)
         self.setAccessibleName(accessible_name)
         self._init_anim(0.0)
         self.toggled.connect(lambda on: self._animate_to(1.0 if on else 0.0))
@@ -192,15 +194,15 @@ class Toggle(_KeyboardFocus, _Animated, QAbstractButton):
         p.setRenderHint(QPainter.Antialiasing)
         if not self.isEnabled():
             p.setOpacity(0.45)
-        track = QRectF(2, 2, 40, 22)
+        track = QRectF(2, 2, 36, 20)
         if self.hasFocus() and self._kb_focus:
             p.setPen(QPen(QColor(k["focus"]), 2))
             p.setBrush(Qt.NoBrush)
-            p.drawRoundedRect(track.adjusted(-1, -1, 1, 1), 12, 12)
+            p.drawRoundedRect(track.adjusted(-1, -1, 1, 1), 11, 11)
         p.setPen(Qt.NoPen if t > 0.5 else QPen(QColor(k["border_hover"]), 1))
         p.setBrush(mix(k["surface_subtle"], k["primary"], t))
-        p.drawRoundedRect(track, 11, 11)
-        knob = 16
+        p.drawRoundedRect(track, 10, 10)
+        knob = 14
         x = track.left() + 3 + (track.width() - knob - 6) * t
         p.setPen(Qt.NoPen)
         p.setBrush(mix(k["text_secondary"], k["on_primary"], t))
@@ -214,7 +216,7 @@ class LevelMeter(Themed, QWidget):
     def __init__(self, color_key="primary", accessible_name="", parent=None):
         super().__init__(parent)
         self.color_key = color_key
-        self.setFixedHeight(8)
+        self.setFixedHeight(6)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setAccessibleName(accessible_name)
         self._v = 0.0
@@ -235,11 +237,11 @@ class LevelMeter(Themed, QWidget):
         r = QRectF(self.rect())
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(k["surface_subtle"]))
-        p.drawRoundedRect(r, 4, 4)
+        p.drawRoundedRect(r, 3, 3)
         color = QColor(k[self.color_key])
         if self._v > 0.005:
             p.setBrush(color)
-            p.drawRoundedRect(QRectF(0, 0, max(8.0, r.width() * self._v), r.height()), 4, 4)
+            p.drawRoundedRect(QRectF(0, 0, max(6.0, r.width() * self._v), r.height()), 3, 3)
         if self._peak > 0.02:
             x = r.width() * self._peak
             p.setBrush(color)
@@ -248,13 +250,24 @@ class LevelMeter(Themed, QWidget):
 
 
 class Combo(QComboBox):
-    """QComboBox that announces when its popup is about to open (to rescan devices)."""
+    """QComboBox that announces when its popup is about to open (to rescan devices).
+
+    The popup is a plain rounded list drawn by the stylesheet. The default one is a native
+    popup window with an OS drop shadow and fade-in, which looks smeared next to our flat UI.
+    """
     aboutToShow = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFocusPolicy(Qt.TabFocus)
         self.setCursor(Qt.PointingHandCursor)
+        self.setItemDelegate(QStyledItemDelegate(self))  # lets ::item rules in the stylesheet apply
+        self.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(8)
+        popup = self.view().window()
+        popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        popup.setAttribute(Qt.WA_TranslucentBackground)
+        self.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
     def showPopup(self):
         self.aboutToShow.emit()
@@ -288,25 +301,28 @@ class Banner(Themed, QFrame):
         self.setObjectName("Banner")
         self.setAttribute(Qt.WA_StyledBackground)
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(14, 12, 12, 12)
-        outer.setSpacing(12)
-        self.icon = IconLabel("check-circle", "success", 20)
+        outer.setContentsMargins(12, 10, 12, 10)
+        outer.setSpacing(10)
+        self.icon = IconLabel("check-circle", "success", 18)
         outer.addWidget(self.icon, 0, Qt.AlignTop)
         col = QVBoxLayout()
         col.setSpacing(2)
-        self.title = QLabel(objectName="BannerTitle")
+        self.title = QLabel(objectName="BannerTitle", wordWrap=True)
         self.body = QLabel(wordWrap=True)
         self.body.setProperty("role", "secondary")
         self.body.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.progress = QProgressBar(textVisible=False, maximum=1000)
         self.progress.hide()
-        col.addWidget(self.title)
+        self.head = QHBoxLayout()
+        self.head.setSpacing(8)
+        self.head.addWidget(self.title, 1)
+        col.addLayout(self.head)
         col.addWidget(self.body)
         col.addSpacing(2)
         col.addWidget(self.progress)
         actions = QHBoxLayout()
         actions.setSpacing(8)
-        actions.setContentsMargins(0, 6, 0, 0)
+        actions.setContentsMargins(0, 4, 0, 0)
         self.primary = QPushButton(cursor=Qt.PointingHandCursor)
         self.primary.setProperty("kind", "primary")
         self.secondary = QPushButton(cursor=Qt.PointingHandCursor)
@@ -336,7 +352,15 @@ class Banner(Themed, QFrame):
             if spec:
                 btn.setText(spec[0])
                 self._handlers[i] = spec[1]
-        self.actions_row.setVisible(primary is not None or secondary is not None)
+        # A lone link fits on the title row; with a main button both go underneath.
+        actions = self.actions_row.layout()
+        self.head.removeWidget(self.secondary)
+        actions.removeWidget(self.secondary)
+        if primary is None:
+            self.head.addWidget(self.secondary, 0, Qt.AlignTop)
+        else:
+            actions.insertWidget(1, self.secondary)
+        self.actions_row.setVisible(primary is not None)
         self.progress.setVisible(progress is not None)
         if progress is not None:
             self.progress.setValue(int(progress * 1000))
@@ -371,4 +395,32 @@ class Row(QWidget):
         v.addWidget(self.hint)
 
     def sizeHint(self):
-        return QSize(320, super().sizeHint().height())
+        return QSize(280, super().sizeHint().height())
+
+
+class TitleBar(QWidget):
+    """The window's own title bar. Drag empty space (or a label) to move the window."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("TitleBar")
+        self.setFixedHeight(40)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(10, 0, 6, 0)
+        h.setSpacing(2)
+
+    @staticmethod
+    def button(tip, accessible, close=False):
+        b = QToolButton(objectName="CloseButton" if close else "ChromeButton", toolTip=tip)
+        b.setAccessibleName(accessible)
+        b.setFocusPolicy(Qt.TabFocus)
+        b.setAutoRaise(True)
+        b.setFixedSize(32, 28)
+        return b
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton and self.window().windowHandle():
+            self.window().windowHandle().startSystemMove()
+            e.accept()
+            return
+        super().mousePressEvent(e)

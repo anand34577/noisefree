@@ -4,7 +4,7 @@
 
 ## The power button
 
-The big round button turns noise removal on and off. You can also click it from the keyboard: press Tab until it's outlined, then Space.
+The round button at the top left turns noise removal on and off. You can also click it from the keyboard: press Tab until it's outlined, then Space.
 
 Switching it off doesn't disconnect anything. Your meeting app keeps getting audio from the virtual microphone; it's just your raw mic instead of the cleaned one. That means you can switch it off mid-call to let people hear something on purpose, like a guitar, without anyone having to change settings.
 
@@ -12,8 +12,8 @@ The ring around the button gets bigger as you speak. It follows the cleaned audi
 
 ## Level meters
 
-- **Your microphone** (grey) is what your mic picks up, noise included.
-- **What others hear** (teal) is what goes to the meeting app.
+- **Your mic** (grey) is what your mic picks up, noise included.
+- **Others hear** (teal) is what goes to the meeting app.
 
 When you're quiet, the teal meter should sit near zero. Both meters use a decibel scale, so small bars mean quiet sounds, and a short line marks the recent peak.
 
@@ -31,7 +31,7 @@ If people say you sound robotic or underwater, lower it in steps of 10.
 
 Plays the cleaned audio back to you, so you can check what other people hear. Use headphones: through speakers, your mic picks up the playback and echoes. The output device is set in [Settings](Configuration#listen-through).
 
-**Hear yourself** always starts switched off when you open the app, so it never plays in your ears by surprise.
+**Hear yourself** stays the way you left it, including after a restart. If you switch it on, switch it off again before you unplug your headphones.
 
 ## The status box
 

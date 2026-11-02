@@ -4,6 +4,20 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-02
+
+### Changed
+
+- The window is about half as tall and fits on small and scaled screens. The power button now sits next to the status text, and the meters, strength slider and status box take less space.
+- NoiseFree draws its own title bar with settings, minimise and close buttons, in the app's colours. On Windows 11 the window keeps rounded corners and a shadow.
+- Dropdown lists open as a clean rounded list below the box, without the blurred shadow and fade.
+- **Hear yourself** is remembered between runs instead of always starting off.
+
+### Fixed
+
+- The window always has a taskbar button while it's open, including after starting in the tray.
+- After a restart, launch at sign-in reopens the window if it was open before, at the same position. Settings are saved before Windows shuts down, so a change made just before a restart isn't lost.
+
 ## [1.0.1] - 2026-11-02
 
 First published release, with downloads for Windows, macOS and Linux. It

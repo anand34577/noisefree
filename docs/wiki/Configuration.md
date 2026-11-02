@@ -34,7 +34,7 @@ The headphones or speakers that **Hear yourself** plays to. The virtual cable is
 
 ### Open when I sign in
 
-Starts NoiseFree in the tray when you log in, without opening the window. Where it's stored:
+Starts NoiseFree when you log in. If the window was open when you last shut down or quit, it opens again in the same place; otherwise NoiseFree starts in the tray. Noise removal, strength, microphone and **Hear yourself** come back the way you left them. Where it's stored:
 
 - Windows: `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`, value `NoiseFree`
 - macOS: `~/Library/LaunchAgents/com.noisefree.app.plist`
