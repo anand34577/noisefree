@@ -20,6 +20,7 @@ Fans, keyboards, traffic and the neighbour's drill all end up in your calls. NVI
 - Shows two live meters, one for your mic and one for what other people hear, so you can see the noise drop.
 - Has a strength slider for when full removal makes your voice sound thin.
 - **Hear yourself** plays the cleaned audio back through your headphones.
+- Cleans up recordings too: open or drop a WAV, FLAC, OGG or MP3 file and get a noise-free copy next to it.
 - Installs the virtual cable from inside the app. On Linux it creates the cable itself, with no driver needed.
 - Notices when you unplug a USB mic and reconnects when it comes back.
 - Lives in the system tray, can start when you sign in, and follows your system's light or dark mode.

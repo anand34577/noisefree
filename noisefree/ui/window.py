@@ -1,9 +1,22 @@
+import os
+import subprocess
+import sys
 import threading
 
-from PySide6.QtCore import QObject, QPoint, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QKeySequence, QPalette, QShortcut
+from PySide6.QtCore import QObject, QPoint, QSettings, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QDesktopServices,
+    QGuiApplication,
+    QIcon,
+    QKeySequence,
+    QPalette,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -19,7 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import devices
+from .. import devices, filedenoise
 from ..denoiser import available_providers, friendly
 from ..engine import Engine
 from ..resources import APP_NAME, VERSION
@@ -36,6 +49,8 @@ class Bridge(QObject):
     model_ready = Signal(str, bool)
     install_progress = Signal(float)
     install_done = Signal(str)
+    file_progress = Signal(float)
+    file_done = Signal(str)  # error message, empty on success
 
 
 def section(text):
@@ -76,6 +91,8 @@ class MainWindow(QMainWindow):
         self.bridge.model_ready.connect(self._on_model_ready)
         self.bridge.install_progress.connect(self._on_install_progress)
         self.bridge.install_done.connect(self._on_install_done)
+        self.bridge.file_progress.connect(self._on_file_progress)
+        self.bridge.file_done.connect(self._on_file_done)
 
         self.linux_mic = None
         self.linux_error = ""
@@ -85,12 +102,15 @@ class MainWindow(QMainWindow):
         self.start_error = ""
         self.install_state, self.install_progress, self.install_error = None, 0.0, ""
         self._quitting = self._ending = False
+        self.file_job = None  # {"state": running|done|error, "src", "dst", "progress", "error"}
+        self._file_cancel = threading.Event()
 
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(icons.app_icon())
         # We draw our own title bar; theme.native_frame() restores the taskbar button and shadow.
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinimizeButtonHint)
         self.setFixedWidth(WIDTH)
+        self.setAcceptDrops(True)  # drop a recording on the window to clean it
 
         root = QWidget(objectName="Root")
         rl = QVBoxLayout(root)
@@ -105,6 +125,7 @@ class MainWindow(QMainWindow):
         self._build_tray()
 
         QShortcut(QKeySequence("Ctrl+,"), self, activated=self.show_settings)
+        QShortcut(QKeySequence("Ctrl+O"), self, activated=lambda: self.clean_recording())
         QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self.show_home)
 
         self.apply_theme()
@@ -146,13 +167,15 @@ class MainWindow(QMainWindow):
         self.window_title = QLabel(APP_NAME, objectName="WindowTitle")
         h.addWidget(self.window_title)
         h.addStretch()
+        self.clean_btn = bar.button("Clean up a recording (Ctrl+O)", "Clean up a recording")
+        self.clean_btn.clicked.connect(lambda: self.clean_recording())
         self.settings_btn = bar.button("Settings (Ctrl+,)", "Settings")
         self.settings_btn.clicked.connect(self.show_settings)
         self.min_btn = bar.button("Minimize", "Minimize")
         self.min_btn.clicked.connect(self.showMinimized)
         self.close_btn = bar.button("Close", "Close", close=True)
         self.close_btn.clicked.connect(self.close)
-        for btn in (self.settings_btn, self.min_btn, self.close_btn):
+        for btn in (self.clean_btn, self.settings_btn, self.min_btn, self.close_btn):
             h.addWidget(btn)
         return bar
 
@@ -371,7 +394,8 @@ class MainWindow(QMainWindow):
         for w in self.findChildren(QWidget):
             if isinstance(w, Themed):
                 w.set_tokens(t)
-        for btn, name in ((self.settings_btn, "sliders"), (self.back_btn, "back"), (self.min_btn, "minus")):
+        for btn, name in ((self.settings_btn, "sliders"), (self.back_btn, "back"), (self.min_btn, "minus"),
+                          (self.clean_btn, "file-audio")):
             btn.setIcon(icons.icon(name, t["text_secondary"], 16))
         close = icons.icon("close", t["text_secondary"], 16)
         close.addPixmap(icons.pixmap("close", "#FFFFFF", 16), QIcon.Active)  # white on the red hover
@@ -543,7 +567,19 @@ class MainWindow(QMainWindow):
     def _refresh_banner(self):
         b, e = self.banner, self.engine
         retry = ("Try again", self._rescan_and_restart)
-        if e.error == "mic" or (self.model_loaded and not self.mics):
+        job = self.file_job
+        if job and job["state"] == "running":
+            b.show_state("info", f"Cleaning up {os.path.basename(job['src'])}…",
+                         f"At {self.strength.value()}% strength. Your mic keeps working meanwhile.",
+                         secondary=("Cancel", self._file_cancel.set), progress=job["progress"])
+        elif job and job["state"] == "done":
+            b.show_state("success", "Recording cleaned", os.path.basename(job["dst"]),
+                         primary=("Play", self._file_play), secondary=("Show in folder", self._file_show))
+        elif job and job["state"] == "error":
+            b.show_state("error", "Couldn't clean the recording", job["error"],
+                         primary=("Choose another file", self.clean_recording),
+                         secondary=("Dismiss", self._file_dismiss))
+        elif e.error == "mic" or (self.model_loaded and not self.mics):
             b.show_state("error", "Microphone disconnected" if self.mics else "No microphone found",
                          "Plug one in. We'll pick it up automatically.", primary=retry)
         elif self.start_error:
@@ -670,6 +706,92 @@ class MainWindow(QMainWindow):
         self.install_error = err
         self._refresh_banner()
 
+    def clean_recording(self, src=None):
+        """Ask for a noisy recording (unless dropped on the window) and where to save the clean copy."""
+        if self.file_job and self.file_job["state"] == "running":
+            return
+        self.show_window()
+        patterns = " ".join(f"*.{x}" for x in filedenoise.EXTENSIONS)
+        start = self.settings.value("recording_dir", os.path.expanduser("~"))
+        if not src:
+            src, _ = QFileDialog.getOpenFileName(self, "Choose a noisy recording", start,
+                                                 f"Audio files ({patterns});;All files (*)")
+        if not src:
+            return
+        dst, _ = QFileDialog.getSaveFileName(self, "Save the cleaned recording as",
+                                             filedenoise.default_output(src), f"Audio files ({patterns})")
+        if not dst:
+            return
+        if os.path.splitext(dst)[1].lower().lstrip(".") not in filedenoise.EXTENSIONS:
+            dst += ".wav"
+        self.settings.setValue("recording_dir", os.path.dirname(src))
+        self.file_job = {"state": "running", "src": src, "dst": dst, "progress": 0.0, "error": ""}
+        self._file_cancel.clear()
+        self.show_home()
+        self._refresh_banner()
+        provider, strength = self.active_provider or "auto", self.strength.value() / 100
+
+        def work():
+            try:
+                filedenoise.clean_file(src, dst, provider, strength, self.bridge.file_progress.emit,
+                                       self._file_cancel.is_set)
+                self.bridge.file_done.emit("")
+            except filedenoise.Cancelled:
+                self.bridge.file_done.emit("cancelled")
+            except Exception as e:
+                self.bridge.file_done.emit(str(e) or e.__class__.__name__)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_file_progress(self, frac):
+        if self.file_job and self.file_job["state"] == "running":
+            self.file_job["progress"] = frac
+            self.banner.progress.setValue(int(frac * 1000))
+
+    def _on_file_done(self, err):
+        job = self.file_job
+        if err == "cancelled":
+            self.file_job = None
+            if os.path.exists(job["dst"]):
+                os.remove(job["dst"])
+        else:
+            job["state"], job["error"] = ("error", err) if err else ("done", "")
+        self._refresh_banner()
+
+    def _file_play(self):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(self.file_job["dst"]))
+
+    def _file_show(self):
+        path = os.path.normpath(self.file_job["dst"])
+        if sys.platform == "win32":
+            subprocess.Popen(["explorer", "/select,", path])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", path])
+        else:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path)))
+        self._file_dismiss()
+
+    def _file_dismiss(self):
+        self.file_job = None
+        self._refresh_banner()
+
+    @staticmethod
+    def _dropped_audio(e):
+        for url in e.mimeData().urls():
+            path = url.toLocalFile()
+            if path and os.path.splitext(path)[1].lower().lstrip(".") in filedenoise.EXTENSIONS:
+                return path
+        return None
+
+    def dragEnterEvent(self, e):
+        if self._dropped_audio(e):
+            e.acceptProposedAction()
+
+    def dropEvent(self, e):
+        path = self._dropped_audio(e)
+        if path:
+            e.acceptProposedAction()
+            QTimer.singleShot(0, lambda: self.clean_recording(path))
+
     def _recheck_cable(self):
         self._rescan_and_restart()
         if self.cable:
@@ -692,6 +814,7 @@ class MainWindow(QMainWindow):
         self.back_btn.setVisible(not home)
         self.logo.setVisible(home)
         self.settings_btn.setVisible(home)
+        self.clean_btn.setVisible(home)
 
     def show_window(self):
         self.show()

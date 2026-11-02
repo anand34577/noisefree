@@ -51,4 +51,6 @@ source code is available at the link above.
 | ONNX Runtime | MIT |
 | PortAudio / python-sounddevice | MIT |
 | python-soxr / libsoxr | LGPL-2.1 |
+| python-soundfile | BSD-3-Clause |
+| libsndfile (bundled with python-soundfile, with libmpg123, LAME, libvorbis, libogg, FLAC and Opus) | LGPL-2.1 and BSD-style |
 | NumPy | BSD-3-Clause |

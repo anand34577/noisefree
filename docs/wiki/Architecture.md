@@ -31,6 +31,7 @@ All model work happens on the mic's audio thread. It takes about 0.4 ms per 8 ms
 | `noisefree/resources.py` | Paths that work from source and from a PyInstaller bundle; version |
 | `noisefree/denoiser.py` | Model download fallback, provider selection, DTLN inference |
 | `noisefree/engine.py` | `Engine` (streams, blocking, blend), `Fifo`, `Output` |
+| `noisefree/filedenoise.py` | Cleans a recording on disk: reads it with libsndfile, runs each channel through the model at 16 kHz, writes it back at the original rate |
 | `noisefree/devices.py` | Device lists per OS, cable detection, Linux null sink, driver installers, launch at login |
 | `noisefree/ui/theme.py` | Light and dark design tokens, the generated Qt stylesheet, native frame (taskbar button, rounded corners, shadow) for the frameless window on Windows |
 | `noisefree/ui/icons.py` | Stroke icons drawn from SVG paths; the app icon |

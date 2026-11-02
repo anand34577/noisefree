@@ -1,6 +1,7 @@
 numpy
 sounddevice
 soxr
+soundfile
 PySide6-Essentials
 # Windows: DirectML runs the model on any GPU (NVIDIA, AMD, Intel), with CPU fallback.
 onnxruntime-directml; sys_platform == "win32"
