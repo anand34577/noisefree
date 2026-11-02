@@ -4,6 +4,17 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-11-02
+
+First published release, with downloads for Windows, macOS and Linux. It
+has every feature listed for 1.0.0 in
+[CHANGELOG.md](https://github.com/anand34577/noisefree/blob/main/CHANGELOG.md),
+plus one fix.
+
+### Fixed
+
+- The BlackHole installer download no longer fails with "HTTP Error 406". This broke the macOS build and would have broken the in-app download on macOS too.
+
 ## [1.0.0] - 2026-11-02
 
 ### Added
