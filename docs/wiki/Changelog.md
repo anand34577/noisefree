@@ -2,6 +2,10 @@
 
 The full list is in [CHANGELOG.md](https://github.com/anand34577/noisefree/blob/main/CHANGELOG.md).
 
+## 1.2.0 (2 November 2026)
+
+Clean up recordings, not just your live mic. Open a WAV, FLAC, OGG or MP3 file, or drop it on the window, and NoiseFree saves a noise-free copy next to it.
+
 ## 1.1.0 (2 November 2026)
 
 A smaller window with its own title bar, a cleaner microphone list, and NoiseFree now comes back after a restart exactly as you left it: window open or in the tray, same place on screen, same settings, including **Hear yourself**.

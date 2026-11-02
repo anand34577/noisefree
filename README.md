@@ -3,7 +3,7 @@
 NoiseFree cleans up your microphone in real time and gives Teams, Zoom, Discord, OBS or any other app a virtual microphone that carries only your voice. It runs on Windows, macOS and Linux, and does all the processing on your own computer.
 
 [![CI](https://github.com/anand34577/noisefree/actions/workflows/ci.yml/badge.svg)](https://github.com/anand34577/noisefree/actions/workflows/ci.yml)
-![Version 1.1.0](https://img.shields.io/badge/version-1.1.0-0F766E)
+![Version 1.2.0](https://img.shields.io/badge/version-1.2.0-0F766E)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-52605D)
 
 <img alt="NoiseFree main window in light and dark mode, with noise removal on and live level meters" src="assets/screenshot-main.png" width="100%">
@@ -20,6 +20,7 @@ Fans, keyboards, traffic and the neighbour's drill all end up in your calls. NVI
 - Shows two live meters, one for your mic and one for what other people hear, so you can see the noise drop.
 - Has a strength slider for when full removal makes your voice sound thin.
 - **Hear yourself** plays the cleaned audio back through your headphones.
+- Cleans up recordings too: open or drop a WAV, FLAC, OGG or MP3 file and get a noise-free copy next to it.
 - Installs the virtual cable from inside the app. On Linux it creates the cable itself, with no driver needed.
 - Notices when you unplug a USB mic and reconnects when it comes back.
 - Lives in the system tray, can start when you sign in, and follows your system's light or dark mode.

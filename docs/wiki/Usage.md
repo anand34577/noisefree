@@ -33,6 +33,16 @@ Plays the cleaned audio back to you, so you can check what other people hear. Us
 
 **Hear yourself** stays the way you left it, including after a restart. If you switch it on, switch it off again before you unplug your headphones.
 
+## Clean up a recording
+
+NoiseFree can also clean a file you already recorded, like a voice note, podcast take or lecture.
+
+1. Click the file icon at the top of the window (or press Ctrl+O), or drag the file onto the window.
+2. Choose where to save the clean copy. By default it goes next to the original as `name (clean).mp3`.
+3. The status box shows progress. When it's done, click **Play** to listen, or **Show in folder**.
+
+It works with WAV, FLAC, OGG and MP3 files. The clean copy keeps the original's sample rate, channels and format, and uses your current **Strength** setting. A minute of audio takes a few seconds, and your live mic keeps working the whole time. Click **Cancel** to stop; nothing is saved.
+
 ## The status box
 
 The box under the controls always tells you the one thing to do next:
@@ -62,4 +72,5 @@ Only **Quit** actually stops NoiseFree. After that, the virtual microphone goes 
 | Tab / Shift+Tab | Move between controls |
 | Space | Toggle the focused button or switch |
 | Ctrl+, | Open Settings |
+| Ctrl+O | Clean up a recording |
 | Esc | Back from Settings |

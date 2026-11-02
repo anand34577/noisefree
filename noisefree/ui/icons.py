@@ -24,6 +24,8 @@ PATHS = {
                 '<line x1="12" x2="12" y1="15" y2="3"/>',
     "back": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     "chevron": '<path d="m6 9 6 6 6-6"/>',
+    "file-audio": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'
+                  '<path d="M8 15v-2"/><path d="M11 17v-6"/><path d="M14 16v-4"/><path d="M17 15v-2"/>',
     "minus": '<path d="M5 12h14"/>',
     "close": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     "refresh": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'
