@@ -32,9 +32,9 @@ All model work happens on the mic's audio thread. It takes about 0.4 ms per 8 ms
 | `noisefree/denoiser.py` | Model download fallback, provider selection, DTLN inference |
 | `noisefree/engine.py` | `Engine` (streams, blocking, blend), `Fifo`, `Output` |
 | `noisefree/devices.py` | Device lists per OS, cable detection, Linux null sink, driver installers, launch at login |
-| `noisefree/ui/theme.py` | Light and dark design tokens, the generated Qt stylesheet, title bar colour |
+| `noisefree/ui/theme.py` | Light and dark design tokens, the generated Qt stylesheet, native frame (taskbar button, rounded corners, shadow) for the frameless window on Windows |
 | `noisefree/ui/icons.py` | Stroke icons drawn from SVG paths; the app icon |
-| `noisefree/ui/widgets.py` | `PowerButton`, `Toggle`, `LevelMeter`, `Banner`, `Row`, focus-visible filter |
+| `noisefree/ui/widgets.py` | `PowerButton`, `Toggle`, `LevelMeter`, `Combo`, `Banner`, `Row`, `TitleBar`, focus-visible filter |
 | `noisefree/ui/window.py` | Home and Settings pages, tray, all state-to-UI logic |
 
 ## Threads

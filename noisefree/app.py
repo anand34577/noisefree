@@ -1,5 +1,6 @@
 import sys
 
+from PySide6.QtCore import Qt
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
@@ -28,6 +29,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setStyle("Fusion")
+    app.setEffectEnabled(Qt.UI_AnimateCombo, False)  # the OS fade makes dropdowns look smeared
     app.setWindowIcon(icons.app_icon())
     app.setQuitOnLastWindowClosed(False)  # the tray keeps us alive
 

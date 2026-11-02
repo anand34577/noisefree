@@ -24,6 +24,8 @@ PATHS = {
                 '<line x1="12" x2="12" y1="15" y2="3"/>',
     "back": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     "chevron": '<path d="m6 9 6 6 6-6"/>',
+    "minus": '<path d="M5 12h14"/>',
+    "close": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     "refresh": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'
                '<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     "cpu": '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/>'
