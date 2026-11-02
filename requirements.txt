@@ -1,0 +1,8 @@
+numpy
+sounddevice
+soxr
+PySide6-Essentials
+# Windows: DirectML runs the model on any GPU (NVIDIA, AMD, Intel), with CPU fallback.
+onnxruntime-directml; sys_platform == "win32"
+# macOS: includes Core ML. Linux: CPU build; swap for onnxruntime-gpu to use CUDA.
+onnxruntime; sys_platform != "win32"

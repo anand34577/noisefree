@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="kit.css">
+<style>
+  body { width: 1280px; height: 640px; position: relative; }
+  .left { position: absolute; left: 88px; top: 0; bottom: 0; width: 560px; display: flex; flex-direction: column; justify-content: center; }
+  .name { font-size: 80px; margin: 0; }
+  .pitch { font-size: 28px; margin: 22px 0 30px; }
+  .win { position: absolute; left: 780px; top: 64px; transform: rotate(-2deg); }
+</style></head>
+<body class="bg-dark grid">
+  <div class="left">
+    <div class="brand"><img src="../logo.svg" width="76" height="76" alt=""><h1 class="name">NoiseFree</h1></div>
+    <p class="pitch">Clean up your microphone for Teams, Zoom and Discord. Noise removal runs on your own machine.</p>
+    <div class="chips"><span class="chip">Windows</span><span class="chip">macOS</span><span class="chip">Linux</span></div>
+  </div>
+  <div class="win dark" data-src="app/home-dark.png"></div>
+  <script src="kit.js"></script>
+</body></html>

@@ -1,0 +1,75 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: NoiseFree-Windows
+            path: dist/NoiseFree.exe
+          - os: macos-latest
+            artifact: NoiseFree-macOS
+            path: dist/NoiseFree-macOS.zip
+          - os: ubuntu-22.04
+            artifact: NoiseFree-Linux
+            path: dist/NoiseFree-Linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen  # build.py draws the app icon with Qt; no display on CI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2 libxcb-cursor0 libegl1
+      - run: pip install -r requirements.txt -r requirements-build.txt
+      - run: python build.py
+      - name: Zip app bundle (macOS)
+        if: runner.os == 'macOS'
+        run: cd dist && ditto -c -k --keepParent NoiseFree.app NoiseFree-macOS.zip
+      - name: Archive binary (Linux, keeps the executable bit)
+        if: runner.os == 'Linux'
+        run: cd dist && tar czf NoiseFree-Linux-x64.tar.gz NoiseFree
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v head="## [$version]" '
+            index($0, head) == 1 { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          cat notes.md
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "NoiseFree ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md \
+            dist/NoiseFree.exe dist/NoiseFree-macOS.zip dist/NoiseFree-Linux-x64.tar.gz

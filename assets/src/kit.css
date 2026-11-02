@@ -1,0 +1,79 @@
+/* Shared look for the README images. Colours match noisefree/ui/theme.py. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  --teal-700: #0F766E;
+  --teal-400: #2DD4BF;
+  --teal-300: #5EEAD4;
+  --ink: #0B1211;
+  --ink-2: #111A19;
+  --paper: #F4F7F6;
+  --text-dark: #F3F6F5;
+  --muted-dark: #9FB0AD;
+  --text-light: #14201E;
+  --muted-light: #52605D;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; overflow: hidden; }
+body { font-family: Inter, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+.bg-dark {
+  color: var(--text-dark);
+  background:
+    radial-gradient(900px 520px at 82% 30%, rgba(45, 212, 191, .20), transparent 62%),
+    radial-gradient(700px 420px at 0% 110%, rgba(15, 118, 110, .30), transparent 60%),
+    var(--ink);
+}
+.bg-light {
+  color: var(--text-light);
+  background:
+    radial-gradient(900px 560px at 85% 10%, rgba(45, 212, 191, .22), transparent 60%),
+    radial-gradient(800px 500px at 0% 100%, rgba(15, 118, 110, .12), transparent 60%),
+    var(--paper);
+}
+/* faint grid, masked to fade out */
+.grid::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at 70% 40%, #000 20%, transparent 75%);
+}
+.bg-light.grid::before {
+  background-image:
+    linear-gradient(rgba(15,118,110,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,118,110,.06) 1px, transparent 1px);
+}
+
+.brand { display: flex; align-items: center; gap: 18px; }
+.brand img { display: block; }
+.name { font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+.pitch { line-height: 1.35; }
+.bg-dark .pitch { color: var(--muted-dark); }
+.bg-light .pitch { color: var(--muted-light); }
+.chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip {
+  font-size: 15px; font-weight: 500; padding: 7px 13px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: var(--muted-dark);
+}
+.bg-light .chip { border-color: rgba(15,118,110,.18); background: rgba(255,255,255,.7); color: var(--muted-light); }
+
+/* Windows 11 style frame around a real app capture */
+.win {
+  width: 402px; border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 50px 100px -20px rgba(0,0,0,.55), 0 20px 40px -20px rgba(0,0,0,.45);
+}
+.win.light { border-color: rgba(0,0,0,.10); box-shadow: 0 50px 90px -30px rgba(9,40,37,.35), 0 18px 36px -18px rgba(9,40,37,.25); }
+.win .bar {
+  height: 32px; display: flex; align-items: center; gap: 8px; padding-left: 12px;
+  font: 12px "Segoe UI", Inter, sans-serif;
+}
+.win.dark .bar { background: #111113; color: #E8E8EA; }
+.win.light .bar { background: #F6F6F7; color: #1B1B1F; }
+.win .bar img { width: 16px; height: 16px; }
+.win .bar .ctl { margin-left: auto; display: flex; }
+.win .bar .ctl svg { width: 46px; height: 32px; }
+.win > img.app { display: block; width: 400px; }
