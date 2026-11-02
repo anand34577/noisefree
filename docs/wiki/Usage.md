@@ -31,7 +31,7 @@ If people say you sound robotic or underwater, lower it in steps of 10.
 
 Plays the cleaned audio back to you, so you can check what other people hear. Use headphones: through speakers, your mic picks up the playback and echoes. The output device is set in [Settings](Configuration#listen-through).
 
-**Hear yourself** always starts switched off when you open the app, so it never plays in your ears by surprise.
+**Hear yourself** stays the way you left it, including after a restart. If you switch it on, switch it off again before you unplug your headphones.
 
 ## The status box
 

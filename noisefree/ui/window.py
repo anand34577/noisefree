@@ -1,6 +1,6 @@
 import threading
 
-from PySide6.QtCore import QObject, QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPoint, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QGuiApplication, QIcon, QKeySequence, QPalette, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         self.active_provider, self.fell_back = "", False
         self.start_error = ""
         self.install_state, self.install_progress, self.install_error = None, 0.0, ""
-        self._quitting = False
+        self._quitting = self._ending = False
 
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(icons.app_icon())
@@ -118,7 +118,13 @@ class MainWindow(QMainWindow):
         self._focus_filter = FocusVisible(self)
         QApplication.instance().installEventFilter(self._focus_filter)
 
-        if not (start_hidden and self.tray.isVisible()):
+        # Windows may end the process at shutdown without a normal quit, so write settings out first.
+        QApplication.instance().commitDataRequest.connect(self._session_ending)
+        QApplication.instance().aboutToQuit.connect(self._session_ending)
+
+        # --minimized comes from launch at sign-in: reopen the window only if it was open last time.
+        self._restore_position()
+        if not (start_hidden and self.tray.isVisible() and not self.settings.value("window_open", True, type=bool)):
             self.show()
         QTimer.singleShot(0, self._boot)
 
@@ -291,7 +297,7 @@ class MainWindow(QMainWindow):
         v.addWidget(section("App"))
         v.addWidget(card(
             field("Appearance", self.theme_combo),
-            Row("Open when I sign in", self.autostart_toggle, "Starts quietly in the system tray."),
+            Row("Open when I sign in", self.autostart_toggle, "Opens the way you left it: in the tray or in a window."),
             Row("Keep running when closed", self.tray_toggle,
                 "Closing the window keeps your clean mic working from the tray."),
         ))
@@ -380,7 +386,7 @@ class MainWindow(QMainWindow):
         self.power.set_checked_silent(s.value("enabled", True, type=bool))
         self.engine.enabled = self.power.isChecked()
         self.tray_power.setChecked(self.power.isChecked())
-        self.monitor_toggle.set_checked_silent(False)  # never start with self-monitoring on
+        self.monitor_toggle.set_checked_silent(s.value("monitor_on", False, type=bool))
         self.tray_toggle.set_checked_silent(s.value("close_to_tray", True, type=bool))
         self.autostart_toggle.set_checked_silent(devices.autostart_enabled())
         idx = self.theme_combo.findData(s.value("theme", "system"))
@@ -610,6 +616,7 @@ class MainWindow(QMainWindow):
             self.engine.set_monitor(dev)
         except Exception:
             self.monitor_toggle.set_checked_silent(False)
+        self.settings.setValue("monitor_on", self.monitor_toggle.isChecked())
         self._refresh_state()
 
     def _on_monitor_device(self, _):
@@ -692,6 +699,31 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def _restore_position(self):
+        pos = self.settings.value("window_pos")
+        if isinstance(pos, QPoint) and QGuiApplication.screenAt(pos + QPoint(40, 20)):
+            self.move(pos)
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        if not e.spontaneous():  # minimising and restoring arrive as spontaneous events
+            self.settings.setValue("window_open", True)
+
+    def hideEvent(self, e):
+        super().hideEvent(e)
+        if not e.spontaneous() and not self._quitting and not self._ending:
+            self.settings.setValue("window_open", False)
+
+    def _session_ending(self, *_):
+        """Sign-out, shutdown or quit: windows may be closed for us now, which isn't the user hiding them."""
+        self._ending = True
+        self.settings.sync()
+
+    def moveEvent(self, e):
+        super().moveEvent(e)
+        if self.isVisible() and not self.isMinimized():
+            self.settings.setValue("window_pos", self.pos())
+
     def closeEvent(self, e):
         if not self._quitting and self.settings.value("close_to_tray", True, type=bool) and self.tray.isVisible():
             e.ignore()
@@ -705,6 +737,7 @@ class MainWindow(QMainWindow):
 
     def quit_app(self):
         self._quitting = True
+        self.settings.sync()
         self.engine.stop()
         if self.linux_mic:
             self.linux_mic.teardown()
