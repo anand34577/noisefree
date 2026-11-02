@@ -18,7 +18,7 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass
 
-from .resources import APP_ID, APP_NAME, is_frozen, launch_command, resource
+from .resources import APP_ID, APP_NAME, VERSION, is_frozen, launch_command, resource
 
 PLATFORM = "linux" if sys.platform.startswith("linux") else sys.platform
 
@@ -189,8 +189,10 @@ class LinuxVirtualMic:
         self.modules.clear()
 
 
-def _download(url, dest, progress):
-    with urllib.request.urlopen(url, timeout=30) as r, open(dest, "wb") as f:
+def download(url, dest, progress=lambda frac: None):
+    # existential.audio answers Python's default User-Agent with HTTP 406
+    req = urllib.request.Request(url, headers={"User-Agent": f"{APP_NAME}/{VERSION}"})
+    with urllib.request.urlopen(req, timeout=30) as r, open(dest, "wb") as f:
         total = int(r.headers.get("Content-Length") or 0)
         done = 0
         while chunk := r.read(64 * 1024):
@@ -211,7 +213,7 @@ def install_cable(progress=lambda frac: None):
     tmp = tempfile.mkdtemp(prefix="noisefree-")
     if PLATFORM == "win32":
         archive = os.path.join(tmp, "vbcable.zip")
-        _download(VBCABLE_URL, archive, progress)
+        download(VBCABLE_URL, archive, progress)
         with zipfile.ZipFile(archive) as z:
             z.extractall(tmp)
         setup = "VBCABLE_Setup_x64.exe" if sys.maxsize > 2**32 else "VBCABLE_Setup.exe"
@@ -222,7 +224,7 @@ def install_cable(progress=lambda frac: None):
         pkg = resource("vendor", "BlackHole2ch.pkg")
         if not os.path.exists(pkg):
             pkg = os.path.join(tmp, "BlackHole2ch.pkg")
-            _download(BLACKHOLE_URL, pkg, progress)
+            download(BLACKHOLE_URL, pkg, progress)
         subprocess.run(["open", pkg], check=True)
     else:
         raise RuntimeError("On Linux the virtual microphone is created automatically.")

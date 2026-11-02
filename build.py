@@ -12,7 +12,6 @@ import plistlib
 import shutil
 import subprocess
 import sys
-import urllib.request
 
 from PySide6.QtWidgets import QApplication
 
@@ -20,7 +19,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 from noisefree.denoiser import ensure_models  # noqa: E402
-from noisefree.devices import BLACKHOLE_URL  # noqa: E402
+from noisefree.devices import BLACKHOLE_URL, download  # noqa: E402
 from noisefree.resources import APP_ID, APP_NAME, VERSION  # noqa: E402
 from noisefree.ui import icons  # noqa: E402
 
@@ -68,7 +67,7 @@ def main():
         os.makedirs(vendor, exist_ok=True)
         pkg = os.path.join(vendor, "BlackHole2ch.pkg")
         if not os.path.exists(pkg):
-            urllib.request.urlretrieve(BLACKHOLE_URL, pkg)
+            download(BLACKHOLE_URL, pkg)
         args += ["--add-data", f"{vendor}{SEP}vendor", "--osx-bundle-identifier", APP_ID]
     else:
         args += ["--onefile"]
