@@ -21,7 +21,7 @@ body:
     attributes:
       label: NoiseFree version
       description: Shown under Settings → About.
-      placeholder: "1.1.0"
+      placeholder: "1.2.0"
   - type: input
     id: processor
     attributes:

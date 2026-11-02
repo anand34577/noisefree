@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-02
+
+### Added
+
+- Clean up a recording: open a WAV, FLAC, OGG or MP3 file (or drop it on the window) and NoiseFree saves a noise-free copy with the same sample rate, channels and format, using your strength setting. Ctrl+O opens it.
+
 ## [1.1.0] - 2026-11-02
 
 ### Changed

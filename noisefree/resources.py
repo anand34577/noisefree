@@ -4,7 +4,7 @@ import sys
 
 APP_NAME = "NoiseFree"
 APP_ID = "com.noisefree.app"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 
 def is_frozen():
